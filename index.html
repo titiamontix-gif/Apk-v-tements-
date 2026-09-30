@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#f5f5f5">
+<title>Mon compteur de vêtements</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f5f5f5;color:#222;font-family:Arial,sans-serif}
+header{padding:22px 18px 12px;position:sticky;top:0;background:#f5f5f5;z-index:2}
+h1{font-size:25px;margin:0 0 5px}.sub{color:#666;font-size:14px}
+main{padding:8px 14px 100px;max-width:700px;margin:auto}
+.card{background:#fff;border-radius:18px;padding:14px;margin:10px 0;box-shadow:0 2px 10px #0000000d;display:flex;gap:14px;align-items:center}
+.photo{width:78px;height:78px;border-radius:14px;object-fit:cover;background:#eee;flex:none}
+.info{flex:1;min-width:0}.name{font-weight:700;font-size:18px;margin-bottom:5px}.count{font-size:14px;color:#666}
+.badge{display:inline-block;margin-top:7px;padding:5px 9px;border-radius:9px;font-size:13px;font-weight:700;background:#e8f5e9;color:#287b35}
+.badge.dirty{background:#ffe8e8;color:#c62828}
+.actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:10px}
+button{border:0;border-radius:12px;padding:10px 12px;font-weight:700;font-size:14px;background:#eee}
+.plus{background:#222;color:#fff}.wash{background:#e7f5e9}.delete{background:#ffecec;color:#b00020}
+.add{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:660px;padding:15px;background:#222;color:#fff;border-radius:16px;font-size:16px}
+.empty{text-align:center;color:#777;padding:50px 20px}
+dialog{border:0;border-radius:20px;padding:20px;width:min(92%,430px);box-shadow:0 10px 40px #0005}
+dialog::backdrop{background:#0006}label{display:block;font-weight:700;margin:13px 0 6px}
+input{width:100%;padding:12px;border:1px solid #ddd;border-radius:11px;font-size:16px}
+.preview{width:100px;height:100px;border-radius:14px;object-fit:cover;background:#eee;display:block;margin:8px 0}
+.modal-actions{display:flex;gap:8px;margin-top:18px}.modal-actions button{flex:1}
+</style>
+</head>
+<body>
+<header><h1>👕 Mes vêtements</h1><div class="sub">Compteur de ports avant lavage</div></header>
+<main id="list"></main>
+<button class="add" onclick="openAdd()">＋ Ajouter un vêtement</button>
+
+<dialog id="dlg">
+<form method="dialog" id="form">
+<h2 style="margin-top:0">Ajouter un vêtement</h2>
+<label>Nom</label><input id="name" required placeholder="Jean noir">
+<label>Laver après combien de ports ?</label><input id="limit" type="number" min="1" value="3" required>
+<label>Photo (facultative)</label><input id="photo" type="file" accept="image/*">
+<img id="preview" class="preview" style="display:none">
+<div class="modal-actions">
+<button type="button" onclick="dlg.close()">Annuler</button>
+<button class="plus" type="submit">Ajouter</button>
+</div>
+</form>
+</dialog>
+
+<script>
+const KEY="vetements_v1"; let clothes=JSON.parse(localStorage.getItem(KEY)||"[]");
+const $=id=>document.getElementById(id);
+function save(){localStorage.setItem(KEY,JSON.stringify(clothes));render()}
+function openAdd(){ $('form').reset(); $('preview').style.display='none'; $('dlg').showModal() }
+$('photo').addEventListener('change',e=>{
+ const f=e.target.files[0]; if(!f)return;
+ const r=new FileReader();r.onload=()=>{$('preview').src=r.result;$('preview').style.display='block'};r.readAsDataURL(f)
+});
+$('form').addEventListener('submit',async e=>{
+ e.preventDefault();
+ const file=$('photo').files[0];
+ let img="";
+ if(file) img=await new Promise(res=>{let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(file)});
+ clothes.push({id:Date.now(),name:$('name').value.trim(),limit:+$('limit').value,worn:0,img});
+ $('dlg').close();save()
+});
+function wear(id){let x=clothes.find(x=>x.id===id);if(x&&x.worn<x.limit)x.worn++;save()}
+function wash(id){let x=clothes.find(x=>x.id===id);if(x)x.worn=0;save()}
+function del(id){if(confirm("Supprimer ce vêtement ?")){clothes=clothes.filter(x=>x.id!==id);save()}}
+function render(){
+ const el=$('list');
+ if(!clothes.length){el.innerHTML='<div class="empty">Aucun vêtement pour le moment.<br>Ajoute ton premier vêtement ci-dessous.</div>';return}
+ el.innerHTML=clothes.map(x=>{
+  const dirty=x.worn>=x.limit;
+  return `<section class="card">
+  ${x.img?`<img class="photo" src="${x.img}">`:`<div class="photo"></div>`}
+  <div class="info"><div class="name">${esc(x.name)}</div>
+  <div class="count">${x.worn} / ${x.limit} ports</div>
+  <div class="badge ${dirty?'dirty':''}">${dirty?'🛑 À LAVER':'✓ Peut encore être porté'}</div>
+  <div class="actions">
+   <button class="plus" onclick="wear(${x.id})">＋ Porté</button>
+   <button class="wash" onclick="wash(${x.id})">🧺 Lavé</button>
+   <button class="delete" onclick="del(${x.id})">Supprimer</button>
+  </div></div></section>`
+ }).join("")
+}
+function esc(s){return s.replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
+render();
+</script>
+</body>
+</html>
